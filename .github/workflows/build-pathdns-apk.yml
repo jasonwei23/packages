@@ -15,6 +15,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Free disk space
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: true
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          swap-storage: true
+
       - name: Install build dependencies
         run: |
           sudo apt-get update
@@ -53,8 +63,13 @@ jobs:
       - name: Build pathdns apk
         working-directory: sdk
         run: |
+          df -h
           make package/pathdns/{download,check} FIXUP=1 V=s
           make package/pathdns/compile -j"$(nproc)" V=s
+
+      - name: Disk usage on failure
+        if: failure()
+        run: df -h
 
       - name: Collect apk
         run: |
