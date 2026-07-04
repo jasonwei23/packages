@@ -29,6 +29,20 @@ start_service() {
 		return 1
 	}
 
+	if [ "$redirect_dns" -eq 1 ]; then
+		# Auto-detect the port pathdns actually listens on from its own
+		# config file, instead of duplicating it into a second UCI
+		# option. If it can't be read, treat that as a broken config
+		# and refuse to start rather than guessing a port - this check
+		# runs before procd_open_instance so a failure here stops the
+		# daemon from starting too, not just the redirect.
+		dns_port=$(jsonfilter -i "$config_file" -e '@.bind.port' 2>/dev/null)
+		[ -n "$dns_port" ] || {
+			echo "pathdns: redirect_dns is enabled but bind.port could not be read from '$config_file'"
+			return 1
+		}
+	fi
+
 	procd_open_instance "$CONFIG"
 	procd_set_param command "$PROG" -c "$config_file"
 	procd_set_param user "$user"
@@ -37,14 +51,7 @@ start_service() {
 	procd_set_param respawn
 	procd_close_instance
 
-	if [ "$redirect_dns" -eq 1 ]; then
-		# Auto-detect the port pathdns actually listens on from its own
-		# config file, so the hijack redirect always matches "bind".port
-		# (pathdns' own built-in default, 65353, if "bind" is omitted)
-		# without duplicating it into a second UCI option.
-		dns_port=$(jsonfilter -i "$config_file" -e '@.bind.port' 2>/dev/null)
-		pathdns_nft_start "${dns_port:-65353}"
-	fi
+	[ "$redirect_dns" -eq 1 ] && pathdns_nft_start "$dns_port"
 }
 
 stop_service() {

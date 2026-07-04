@@ -11,9 +11,12 @@ a policy-based DNS forwarder. Builds the upstream Rust crate via the
   optional DNS-hijack redirect: when `redirect_dns` is enabled, all tcp/udp port-53
   traffic on the router is DNAT'd (via a dedicated `inet pathdns` nftables table, so a
   `fw4 reload` won't wipe it) to whatever port pathdns is actually listening on. That
-  port is read automatically from `config_file`'s `bind.port` at service start (falling
-  back to pathdns' own built-in default, 65353, if omitted) — no need to duplicate it
-  into a second UCI option.
+  port is read automatically from `config_file`'s `bind.port` at service start — no
+  need to duplicate it into a second UCI option. If it can't be read (missing/invalid
+  `bind.port`, bad JSON, wrong path), that's treated as a broken config and the service
+  refuses to start at all, rather than guessing a port. This means `bind.port` must be
+  set explicitly in `config_file` to use `redirect_dns`, even though pathdns itself is
+  happy to fall back to its own built-in default (65353) when `bind` is omitted.
 - `files/pathdns.config` — default UCI config (`/etc/config/pathdns`): `enabled`,
   `config_file`, `user`, `redirect_dns` — disabled by default.
 - `files/pathdns.json` — default JSON config (`/etc/pathdns/config.json`): loopback bind on
@@ -51,3 +54,6 @@ make package/pathdns/{clean,compile} V=s
 - The `redirect_dns` nftables rule's target port is fixed when the service
   starts; if you hot-edit `bind.port` in a running config, restart the
   service (`/etc/init.d/pathdns restart`) so the redirect picks it up.
+- With `redirect_dns` enabled, `config_file` must set `bind.port` explicitly
+  (the init script refuses to start rather than assume pathdns' own 65353
+  default — see the note in Layout above).
