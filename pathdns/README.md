@@ -1,12 +1,18 @@
 # pathdns OpenWrt package
 
 OpenWrt `Makefile` + service files for [pathdns](https://github.com/jasonwei23/pathdns),
-a policy-based DNS forwarder. Builds the upstream Rust crate via the
-`lang/rust` feed's `rust-package.mk`.
+a policy-based DNS forwarder. This package does **not** compile pathdns —
+it downloads and repackages the prebuilt static aarch64-musl binary that
+pathdns' own release workflow already publishes
+(`pathdns-linux-aarch64` on the GitHub release), verified against its
+sha256. aarch64-only; there's no upstream release binary for other
+architectures.
 
 ## Layout
 
-- `Makefile` — package definition (GitHub release tarball source, Rust build, install rules).
+- `Makefile` — package definition: fetches the release binary (`PKG_SOURCE`/
+  `PKG_HASH`), `Build/Compile` is a no-op, `Package/pathdns/install` just
+  installs it plus the service files below.
 - `files/pathdns.init` — procd init script (`/etc/init.d/pathdns`). Also implements an
   optional DNS-hijack redirect: when `redirect_dns` is enabled, all tcp/udp port-53
   traffic on the router is DNAT'd (via a dedicated `inet pathdns` nftables table, so a
@@ -28,48 +34,46 @@ a policy-based DNS forwarder. Builds the upstream Rust crate via the
 ## Using this package
 
 Drop this directory into an OpenWrt buildroot's package tree (e.g. as
-`package/pathdns` or as a feed entry), with the official `packages` feed
-present at `feeds/packages` (needed for `lang/rust/rust-package.mk` and the
-Rust host toolchain), then:
+`package/pathdns` or as a feed entry) — no external feed is required, since
+there's nothing to compile, just `package/pathdns/{download,compile}` (a
+no-op) and `install` — then:
 
 ```sh
-./scripts/feeds update -a && ./scripts/feeds install -a
 make menuconfig   # Network > pathdns
 make package/pathdns/{clean,compile} V=s
 ```
 
 `.github/workflows/build-pathdns-apk.yml` automates this against a
-downloaded OpenWrt SDK (no local buildroot checkout needed) and produces
-an aarch64 `.apk`, modeled on
-[douglarek/mihomo-openwrt](https://github.com/douglarek/mihomo-openwrt)'s
-approach: download the target's SDK + `config.buildinfo`, copy this
-package in, `download`/`check`/`compile` it, sign with an ephemeral CI
-key so `apk` will accept the result with `--allow-untrusted`. It's
-manual-only (`workflow_dispatch`, from the Actions tab).
-`OPENWRT_RELEASE`/`OPENWRT_TARGET`/`OPENWRT_SUBTARGET` at the top of the
-workflow pin the SDK; bump `OPENWRT_RELEASE` as OpenWrt cuts new releases.
+downloaded OpenWrt SDK (no local buildroot checkout needed): download the
+target's SDK + `config.buildinfo`, copy this package in,
+`download`/`check`/`compile` (no-op) it, sign with an ephemeral CI key so
+`apk` will accept the result with `--allow-untrusted` — same overall shape
+as [douglarek/mihomo-openwrt](https://github.com/douglarek/mihomo-openwrt)'s
+`build.yml`, minus the actual compilation step since pathdns already
+publishes the binary. It's manual-only (`workflow_dispatch`, from the
+Actions tab). `OPENWRT_RELEASE`/`OPENWRT_TARGET`/`OPENWRT_SUBTARGET` at the
+top of the workflow pin the SDK; bump `OPENWRT_RELEASE` as OpenWrt cuts new
+releases.
 
 ## Known follow-ups for a maintainer
 
-- The package now tracks tagged GitHub releases (`PKG_SOURCE_URL` points at
-  `codeload.github.com/.../tar.gz/v$(PKG_VERSION)`) instead of a pinned git
-  commit. Bumping to a new upstream release means bumping `PKG_VERSION` and
-  `PKG_HASH` together — get the hash with
-  `curl -fsSL "https://codeload.github.com/jasonwei23/pathdns/tar.gz/vX.Y.Z" | sha256sum`.
-  An earlier version of this Makefile used `PKG_SOURCE_PROTO:=git` pinned to
-  a commit before pathdns had any tags; that path turned out to be fragile
-  in practice (OpenWrt's `dl_github_archive.py` requires a real hash and
-  produces a tarball that doesn't hash-match a plain `git archive` of the
-  same commit, so it always fell through to a slow git-clone fallback) and
-  was dropped once a real release existed to build from instead.
+- Bumping to a new upstream release means bumping `PKG_VERSION` and
+  `PKG_HASH` together — get the hash from the release's published
+  `pathdns-linux-aarch64.sha256` asset, or
+  `curl -fsSL ".../releases/download/vX.Y.Z/pathdns-linux-aarch64" | sha256sum`.
+  An earlier version of this Makefile built from source (first a pinned git
+  commit, then a release source tarball via `lang/rust/rust-package.mk`);
+  both were dropped once pathdns started publishing a release binary,
+  since OpenWrt's `lang/rust` bootstraps a full from-source rustc+cargo
+  host toolchain against OpenWrt's own musl (it can't use a prebuilt
+  rustup toolchain, since that's built against upstream musl) — heavy
+  enough to exhaust a default GitHub Actions runner's disk, and pointless
+  next to a static binary pathdns already builds and signs itself.
 - Upstream has no `LICENSE` file yet despite `Cargo.toml` declaring
   `license = "MIT"`; add one upstream, then set `PKG_LICENSE_FILES:=LICENSE`.
 - pathdns requires Linux kernel >= 6.0 with io_uring available (it self-checks
   and refuses to start otherwise) — not something `DEPENDS` can express, so
   it's runtime-enforced by pathdns itself.
-- Optional Cargo features `doq` (DNS-over-QUIC) and `h3` (DoH3) are not
-  enabled by default; add `RUST_PKG_FEATURES:=doq,h3` in the Makefile if
-  those upstream transports are needed.
 - The `redirect_dns` nftables rule's target port is fixed when the service
   starts; if you hot-edit `bind.port` in a running config, restart the
   service (`/etc/init.d/pathdns restart`) so the redirect picks it up.

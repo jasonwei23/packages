@@ -4,18 +4,14 @@ PKG_NAME:=pathdns
 PKG_VERSION:=0.1.1
 PKG_RELEASE:=1
 
-PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
-PKG_SOURCE_URL:=https://codeload.github.com/jasonwei23/pathdns/tar.gz/v$(PKG_VERSION)?
-PKG_HASH:=f72d9e5af1ae96352d159ba16effccb3657fcf69b7e6ea67616c8c2d85753657
+PKG_SOURCE:=pathdns-linux-aarch64
+PKG_SOURCE_URL:=https://github.com/jasonwei23/pathdns/releases/download/v$(PKG_VERSION)
+PKG_HASH:=713d00a9ef82fdb0f44bfac73e7a73e62a6748a2dbff332c4cffc54cc0cfce82
 
 PKG_MAINTAINER:=jasonwei23 <jasonwei23@users.noreply.github.com>
 PKG_LICENSE:=MIT
 
-PKG_BUILD_DEPENDS:=rust/host
-PKG_BUILD_PARALLEL:=1
-
 include $(INCLUDE_DIR)/package.mk
-include $(TOPDIR)/feeds/packages/lang/rust/rust-package.mk
 
 define Package/pathdns
   SECTION:=net
@@ -23,7 +19,7 @@ define Package/pathdns
   SUBMENU:=IP Addresses and Names
   TITLE:=Policy-based DNS forwarder for split-horizon deployments
   URL:=https://github.com/jasonwei23/pathdns
-  DEPENDS:=$(RUST_ARCH_DEPENDS) +jsonfilter +nftables
+  DEPENDS:=@aarch64 +jsonfilter +nftables
 endef
 
 define Package/pathdns/description
@@ -39,6 +35,9 @@ define Package/pathdns/description
   Optionally hijacks all LAN DNS traffic (tcp/udp port 53) to pathdns via
   a dedicated nftables table, regardless of clients' configured resolver
   (see the redirect_dns option in /etc/config/pathdns).
+
+  This package repackages the prebuilt static aarch64-musl binary from
+  pathdns' own GitHub release rather than building from source.
 endef
 
 define Package/pathdns/conffiles
@@ -46,9 +45,17 @@ define Package/pathdns/conffiles
 /etc/pathdns/config.json
 endef
 
+define Build/Prepare
+	mkdir -p $(PKG_BUILD_DIR)
+	$(CP) $(DL_DIR)/$(PKG_SOURCE) $(PKG_BUILD_DIR)/pathdns
+endef
+
+define Build/Compile
+endef
+
 define Package/pathdns/install
 	$(INSTALL_DIR) $(1)/usr/sbin
-	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/bin/pathdns $(1)/usr/sbin/pathdns
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/pathdns $(1)/usr/sbin/pathdns
 
 	$(INSTALL_DIR) $(1)/etc/init.d
 	$(INSTALL_BIN) ./files/pathdns.init $(1)/etc/init.d/pathdns
