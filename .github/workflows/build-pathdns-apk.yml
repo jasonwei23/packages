@@ -3,6 +3,9 @@ name: Build pathdns aarch64 apk
 on:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 env:
   OPENWRT_RELEASE: 25.12.2
   OPENWRT_TARGET: armsr
@@ -59,9 +62,29 @@ jobs:
           mkdir -p dist
           cp "$APK" "dist/$(basename "$APK" .apk)_aarch64.apk"
           echo "APK_PATH=dist/$(basename "$APK" .apk)_aarch64.apk" >> "$GITHUB_ENV"
+          echo "APK_NAME=$(basename "$APK" .apk)_aarch64.apk" >> "$GITHUB_ENV"
+          PKG_VERSION=$(sed -n 's/^PKG_VERSION:=//p' pathdns/Makefile)
+          echo "PKG_VERSION=${PKG_VERSION}" >> "$GITHUB_ENV"
+          echo "RELEASE_TAG=pathdns-v${PKG_VERSION}" >> "$GITHUB_ENV"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: pathdns-aarch64-apk
           path: ${{ env.APK_PATH }}
+
+      - name: Publish to GitHub Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: pathdns ${{ env.RELEASE_TAG }} (OpenWrt aarch64 apk)
+          files: ${{ env.APK_PATH }}
+          body: |
+            OpenWrt aarch64 (`${{ env.OPENWRT_TARGET }}/${{ env.OPENWRT_SUBTARGET }}`, OpenWrt ${{ env.OPENWRT_RELEASE }}) `.apk` package for
+            [pathdns v${{ env.PKG_VERSION }}](https://github.com/jasonwei23/pathdns/releases/tag/v${{ env.PKG_VERSION }}),
+            built from the `pathdns/` package definition in this repo.
+
+            Unsigned by any trusted key - install with:
+            ```sh
+            apk add ${{ env.APK_NAME }} --allow-untrusted
+            ```
