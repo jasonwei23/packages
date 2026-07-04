@@ -2,6 +2,12 @@ name: Build pathdns aarch64 apk
 
 on:
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'pathdns version to build (e.g. 0.1.2); leave empty to build whatever pathdns/Makefile is currently pinned to'
+        required: false
+  repository_dispatch:
+    types: [pathdns-release]
 
 permissions:
   contents: write
@@ -17,6 +23,28 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Sync pathdns version
+        env:
+          DISPATCH_VERSION: ${{ github.event.client_payload.version }}
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+        run: |
+          NEW_VERSION="${DISPATCH_VERSION:-$INPUT_VERSION}"
+          CURRENT_VERSION=$(sed -n 's/^PKG_VERSION:=//p' pathdns/Makefile)
+          if [ -n "$NEW_VERSION" ] && [ "$NEW_VERSION" != "$CURRENT_VERSION" ]; then
+            echo "Bumping pathdns $CURRENT_VERSION -> $NEW_VERSION"
+            HASH=$(curl -fsSL "https://github.com/jasonwei23/pathdns/releases/download/v${NEW_VERSION}/pathdns-linux-aarch64" | sha256sum | cut -d' ' -f1)
+            [ "${#HASH}" = 64 ] || { echo "Failed to fetch/hash pathdns v${NEW_VERSION} release binary"; exit 1; }
+            sed -i "s/^PKG_VERSION:=.*/PKG_VERSION:=${NEW_VERSION}/" pathdns/Makefile
+            sed -i "s/^PKG_HASH:=.*/PKG_HASH:=${HASH}/" pathdns/Makefile
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add pathdns/Makefile
+            git commit -m "pathdns: bump to v${NEW_VERSION}"
+            git push
+          else
+            echo "Building currently pinned version $CURRENT_VERSION"
+          fi
 
       - name: Install build dependencies
         run: |
