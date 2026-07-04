@@ -1,0 +1,10 @@
+{
+  "bind": { "addr": "127.0.0.1", "port": 65353 },
+  "route": {
+    "rules": [
+      { "name": "default", "upstream": ["119.29.29.29", "223.5.5.5"] }
+    ],
+    "final": "default"
+  },
+  "cache": { "size": 10000 }
+}

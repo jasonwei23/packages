@@ -1,0 +1,55 @@
+#!/bin/sh /etc/rc.common
+# SPDX-License-Identifier: MIT
+
+START=94
+STOP=15
+
+USE_PROCD=1
+PROG=/usr/sbin/pathdns
+CONFIG=pathdns
+
+start_service() {
+	local enabled config_file user respawn_threshold respawn_timeout respawn_retry file_limit
+
+	config_load "$CONFIG"
+	config_get_bool enabled main enabled 0
+	config_get config_file main config_file '/etc/pathdns/config.json'
+	config_get user main user 'root'
+	config_get respawn_threshold main respawn_threshold 3600
+	config_get respawn_timeout main respawn_timeout 5
+	config_get respawn_retry main respawn_retry 5
+	config_get file_limit main file_limit 65535
+
+	[ "$enabled" -eq 1 ] || {
+		echo "pathdns: disabled - set 'option enabled 1' in /etc/config/pathdns"
+		return 1
+	}
+
+	[ -r "$config_file" ] || {
+		echo "pathdns: config file '$config_file' not found"
+		return 1
+	}
+
+	procd_open_instance "$CONFIG"
+	procd_set_param command "$PROG" -c "$config_file"
+
+	procd_set_param user "$user"
+	procd_set_param limits nofile="$file_limit $file_limit"
+	procd_set_param stdout 1
+	procd_set_param stderr 1
+	procd_set_param respawn "$respawn_threshold" "$respawn_timeout" "$respawn_retry"
+
+	procd_close_instance
+}
+
+# pathdns watches its ruleset files and routing config on disk and hot-reloads
+# them itself (no SIGHUP needed) - a full restart is only required when
+# enabled/config_file/user or process limits change.
+reload_service() {
+	stop
+	start
+}
+
+service_triggers() {
+	procd_add_reload_trigger "$CONFIG"
+}
