@@ -6,7 +6,7 @@ a policy-based DNS forwarder. Builds the upstream Rust crate via the
 
 ## Layout
 
-- `Makefile` — package definition (git snapshot source, Rust build, install rules).
+- `Makefile` — package definition (GitHub release tarball source, Rust build, install rules).
 - `files/pathdns.init` — procd init script (`/etc/init.d/pathdns`). Also implements an
   optional DNS-hijack redirect: when `redirect_dns` is enabled, all tcp/udp port-53
   traffic on the router is DNAT'd (via a dedicated `inet pathdns` nftables table, so a
@@ -51,13 +51,17 @@ workflow pin the SDK; bump `OPENWRT_RELEASE` as OpenWrt cuts new releases.
 
 ## Known follow-ups for a maintainer
 
-- `PKG_MIRROR_HASH` is pinned to the sha256 of the `pathdns-0.1.0.tar.zst`
-  produced by OpenWrt's own git clone-then-`git archive` fallback for
-  `PKG_SOURCE_VERSION`'s commit (the documented way to pin a git-sourced
-  package's hash, per `scripts/dl_github_archive.py`'s docstring) — it lets
-  `dl_github_archive.py` fetch straight from GitHub's tarball API instead of
-  a full clone. Re-derive it whenever `PKG_SOURCE_VERSION` changes; the
-  build fails loudly on a mismatch rather than silently using bad source.
+- The package now tracks tagged GitHub releases (`PKG_SOURCE_URL` points at
+  `codeload.github.com/.../tar.gz/v$(PKG_VERSION)`) instead of a pinned git
+  commit. Bumping to a new upstream release means bumping `PKG_VERSION` and
+  `PKG_HASH` together — get the hash with
+  `curl -fsSL "https://codeload.github.com/jasonwei23/pathdns/tar.gz/vX.Y.Z" | sha256sum`.
+  An earlier version of this Makefile used `PKG_SOURCE_PROTO:=git` pinned to
+  a commit before pathdns had any tags; that path turned out to be fragile
+  in practice (OpenWrt's `dl_github_archive.py` requires a real hash and
+  produces a tarball that doesn't hash-match a plain `git archive` of the
+  same commit, so it always fell through to a slow git-clone fallback) and
+  was dropped once a real release existed to build from instead.
 - Upstream has no `LICENSE` file yet despite `Cargo.toml` declaring
   `license = "MIT"`; add one upstream, then set `PKG_LICENSE_FILES:=LICENSE`.
 - pathdns requires Linux kernel >= 6.0 with io_uring available (it self-checks
