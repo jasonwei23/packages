@@ -1,7 +1,3 @@
-# SPDX-License-Identifier: MIT
-#
-# OpenWrt package for pathdns (https://github.com/jasonwei23/pathdns)
-
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=pathdns
@@ -12,25 +8,13 @@ PKG_SOURCE_PROTO:=git
 PKG_SOURCE_URL:=https://github.com/jasonwei23/pathdns.git
 PKG_SOURCE_DATE:=2026-07-04
 PKG_SOURCE_VERSION:=afe83a714fda2318ae0dc5dafae416b0affb45ce
-# No signed release tarball exists yet for this snapshot, so the mirror
-# checksum can't be pre-computed here. Run `make package/pathdns/download
-# V=s` once against a real OpenWrt tree and replace this with the printed
-# hash before submitting/building for production.
 PKG_MIRROR_HASH:=skip
 
 PKG_MAINTAINER:=jasonwei23 <jasonwei23@users.noreply.github.com>
 PKG_LICENSE:=MIT
-# Upstream Cargo.toml declares `license = "MIT"` but the repository does not
-# yet ship a LICENSE file to point PKG_LICENSE_FILES at. Add one upstream and
-# set PKG_LICENSE_FILES:=LICENSE here once it exists.
 
 PKG_BUILD_DEPENDS:=rust/host
 PKG_BUILD_PARALLEL:=1
-
-# pathdns requires Linux >= 6.0 (io_uring multishot recvmsg with provided
-# buffer rings, no recvmmsg fallback) and refuses to start on older kernels.
-# OpenWrt's package DEPENDS syntax has no way to express a minimum kernel
-# version, so this is enforced by pathdns itself at runtime, not by opkg/apk.
 
 include $(INCLUDE_DIR)/package.mk
 include $(TOPDIR)/feeds/packages/lang/rust/rust-package.mk
@@ -41,9 +25,6 @@ define Package/pathdns
   SUBMENU:=IP Addresses and Names
   TITLE:=Policy-based DNS forwarder for split-horizon deployments
   URL:=https://github.com/jasonwei23/pathdns
-  # +jsonfilter: reads config_file's bind.port at service start to size the
-  # optional nftables DNS-hijack redirect (see files/pathdns.init).
-  # +nftables: backs that same redirect.
   DEPENDS:=$(RUST_ARCH_DEPENDS) +jsonfilter +nftables
 endef
 
