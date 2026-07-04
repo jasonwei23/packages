@@ -7,18 +7,17 @@ STOP=15
 USE_PROCD=1
 PROG=/usr/sbin/pathdns
 CONFIG=pathdns
+NFT=/usr/sbin/nft
+NFT_TABLE=pathdns
 
 start_service() {
-	local enabled config_file user respawn_threshold respawn_timeout respawn_retry file_limit
+	local enabled config_file user redirect_dns dns_port
 
 	config_load "$CONFIG"
 	config_get_bool enabled main enabled 0
 	config_get config_file main config_file '/etc/pathdns/config.json'
 	config_get user main user 'root'
-	config_get respawn_threshold main respawn_threshold 3600
-	config_get respawn_timeout main respawn_timeout 5
-	config_get respawn_retry main respawn_retry 5
-	config_get file_limit main file_limit 65535
+	config_get_bool redirect_dns main redirect_dns 0
 
 	[ "$enabled" -eq 1 ] || {
 		echo "pathdns: disabled - set 'option enabled 1' in /etc/config/pathdns"
@@ -32,19 +31,31 @@ start_service() {
 
 	procd_open_instance "$CONFIG"
 	procd_set_param command "$PROG" -c "$config_file"
-
 	procd_set_param user "$user"
-	procd_set_param limits nofile="$file_limit $file_limit"
 	procd_set_param stdout 1
 	procd_set_param stderr 1
-	procd_set_param respawn "$respawn_threshold" "$respawn_timeout" "$respawn_retry"
-
+	procd_set_param respawn
 	procd_close_instance
+
+	if [ "$redirect_dns" -eq 1 ]; then
+		# Auto-detect the port pathdns actually listens on from its own
+		# config file, so the hijack redirect always matches "bind".port
+		# (pathdns' own built-in default, 65353, if "bind" is omitted)
+		# without duplicating it into a second UCI option.
+		dns_port=$(jsonfilter -i "$config_file" -e '@.bind.port' 2>/dev/null)
+		pathdns_nft_start "${dns_port:-65353}"
+	fi
 }
 
-# pathdns watches its ruleset files and routing config on disk and hot-reloads
-# them itself (no SIGHUP needed) - a full restart is only required when
-# enabled/config_file/user or process limits change.
+stop_service() {
+	pathdns_nft_stop
+}
+
+# pathdns watches its ruleset files and routing config on disk and
+# hot-reloads them itself (no SIGHUP needed) - a full restart is only
+# needed when enabled/config_file/user/redirect_dns change, or when
+# config_file's "bind".port changes (the nftables redirect target is
+# fixed at start time).
 reload_service() {
 	stop
 	start
@@ -52,4 +63,30 @@ reload_service() {
 
 service_triggers() {
 	procd_add_reload_trigger "$CONFIG"
+}
+
+# Transparently redirects all tcp/udp port-53 traffic hitting the router to
+# pathdns' real listening port, so LAN clients are forced through pathdns
+# regardless of which DNS server they're configured to use. Uses its own
+# nftables table (not fw4's) so a `fw4 reload` can't wipe these rules out
+# from under it.
+pathdns_nft_start() {
+	local dns_port="$1"
+
+	[ -x "$NFT" ] || {
+		echo "pathdns: nft not found: $NFT" >&2
+		return 1
+	}
+
+	$NFT delete table inet "$NFT_TABLE" 2>/dev/null
+	$NFT add table inet "$NFT_TABLE" || return 1
+	$NFT "add chain inet $NFT_TABLE prerouting { type nat hook prerouting priority dstnat - 1; policy accept; }" || return 1
+	$NFT "add rule inet $NFT_TABLE prerouting meta l4proto { tcp, udp } th dport 53 redirect to :$dns_port" || return 1
+
+	return 0
+}
+
+pathdns_nft_stop() {
+	[ -x "$NFT" ] && $NFT delete table inet "$NFT_TABLE" 2>/dev/null
+	return 0
 }

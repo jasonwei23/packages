@@ -7,8 +7,15 @@ a policy-based DNS forwarder. Builds the upstream Rust crate via the
 ## Layout
 
 - `Makefile` — package definition (git snapshot source, Rust build, install rules).
-- `files/pathdns.init` — procd init script (`/etc/init.d/pathdns`).
-- `files/pathdns.config` — default UCI config (`/etc/config/pathdns`), disabled by default.
+- `files/pathdns.init` — procd init script (`/etc/init.d/pathdns`). Also implements an
+  optional DNS-hijack redirect: when `redirect_dns` is enabled, all tcp/udp port-53
+  traffic on the router is DNAT'd (via a dedicated `inet pathdns` nftables table, so a
+  `fw4 reload` won't wipe it) to whatever port pathdns is actually listening on. That
+  port is read automatically from `config_file`'s `bind.port` at service start (falling
+  back to pathdns' own built-in default, 65353, if omitted) — no need to duplicate it
+  into a second UCI option.
+- `files/pathdns.config` — default UCI config (`/etc/config/pathdns`): `enabled`,
+  `config_file`, `user`, `redirect_dns` — disabled by default.
 - `files/pathdns.json` — default JSON config (`/etc/pathdns/config.json`): loopback bind on
   port 65353, single catch-all rule to two public resolvers, no dashboard. Edit this (or
   point `config_file` in `/etc/config/pathdns` elsewhere) before enabling the service —
@@ -41,3 +48,6 @@ make package/pathdns/{clean,compile} V=s
 - Optional Cargo features `doq` (DNS-over-QUIC) and `h3` (DoH3) are not
   enabled by default; add `RUST_PKG_FEATURES:=doq,h3` in the Makefile if
   those upstream transports are needed.
+- The `redirect_dns` nftables rule's target port is fixed when the service
+  starts; if you hot-edit `bind.port` in a running config, restart the
+  service (`/etc/init.d/pathdns restart`) so the redirect picks it up.

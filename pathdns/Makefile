@@ -41,7 +41,10 @@ define Package/pathdns
   SUBMENU:=IP Addresses and Names
   TITLE:=Policy-based DNS forwarder for split-horizon deployments
   URL:=https://github.com/jasonwei23/pathdns
-  DEPENDS:=$(RUST_ARCH_DEPENDS)
+  # +jsonfilter: reads config_file's bind.port at service start to size the
+  # optional nftables DNS-hijack redirect (see files/pathdns.init).
+  # +nftables: backs that same redirect.
+  DEPENDS:=$(RUST_ARCH_DEPENDS) +jsonfilter +nftables
 endef
 
 define Package/pathdns/description
@@ -53,6 +56,10 @@ define Package/pathdns/description
 
   Linux-only: uses io_uring (multishot recvmsg), sendmmsg, SO_REUSEPORT
   and netlink directly. Requires Linux kernel 6.0 or newer.
+
+  Optionally hijacks all LAN DNS traffic (tcp/udp port 53) to pathdns via
+  a dedicated nftables table, regardless of clients' configured resolver
+  (see the redirect_dns option in /etc/config/pathdns).
 endef
 
 define Package/pathdns/conffiles
