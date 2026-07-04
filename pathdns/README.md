@@ -38,6 +38,18 @@ make menuconfig   # Network > pathdns
 make package/pathdns/{clean,compile} V=s
 ```
 
+`.github/workflows/build-pathdns-apk.yml` automates this against a
+downloaded OpenWrt SDK (no local buildroot checkout needed) and produces
+an aarch64 `.apk`, modeled on
+[douglarek/mihomo-openwrt](https://github.com/douglarek/mihomo-openwrt)'s
+approach: download the target's SDK + `config.buildinfo`, copy this
+package in, `download`/`check`/`compile` it, sign with an ephemeral CI
+key so `apk` will accept the result with `--allow-untrusted`. Run it via
+the Actions tab (`workflow_dispatch`) or by pushing to `main` under
+`pathdns/`. `OPENWRT_RELEASE`/`OPENWRT_TARGET`/`OPENWRT_SUBTARGET` at the
+top of the workflow pin the SDK; bump `OPENWRT_RELEASE` as OpenWrt cuts
+new point releases.
+
 ## Known follow-ups for a maintainer
 
 - `PKG_MIRROR_HASH:=skip` — no release tarball/mirror hash exists yet for this
