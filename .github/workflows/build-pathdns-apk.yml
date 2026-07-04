@@ -2,14 +2,9 @@ name: Build pathdns aarch64 apk
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - 'pathdns/**'
-      - '.github/workflows/build-pathdns-apk.yml'
 
 env:
-  OPENWRT_RELEASE: 24.10.5
+  OPENWRT_RELEASE: 25.12.2
   OPENWRT_TARGET: armsr
   OPENWRT_SUBTARGET: armv8
 

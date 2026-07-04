@@ -8,7 +8,7 @@ PKG_SOURCE_PROTO:=git
 PKG_SOURCE_URL:=https://github.com/jasonwei23/pathdns.git
 PKG_SOURCE_DATE:=2026-07-04
 PKG_SOURCE_VERSION:=afe83a714fda2318ae0dc5dafae416b0affb45ce
-PKG_MIRROR_HASH:=skip
+PKG_MIRROR_HASH:=c9d12cfcb61b983f965fcb9aa9f4959b98934bd2ebd41bfa3a70cd9aeed01fc6
 
 PKG_MAINTAINER:=jasonwei23 <jasonwei23@users.noreply.github.com>
 PKG_LICENSE:=MIT

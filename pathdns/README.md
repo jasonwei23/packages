@@ -44,17 +44,20 @@ an aarch64 `.apk`, modeled on
 [douglarek/mihomo-openwrt](https://github.com/douglarek/mihomo-openwrt)'s
 approach: download the target's SDK + `config.buildinfo`, copy this
 package in, `download`/`check`/`compile` it, sign with an ephemeral CI
-key so `apk` will accept the result with `--allow-untrusted`. Run it via
-the Actions tab (`workflow_dispatch`) or by pushing to `main` under
-`pathdns/`. `OPENWRT_RELEASE`/`OPENWRT_TARGET`/`OPENWRT_SUBTARGET` at the
-top of the workflow pin the SDK; bump `OPENWRT_RELEASE` as OpenWrt cuts
-new point releases.
+key so `apk` will accept the result with `--allow-untrusted`. It's
+manual-only (`workflow_dispatch`, from the Actions tab).
+`OPENWRT_RELEASE`/`OPENWRT_TARGET`/`OPENWRT_SUBTARGET` at the top of the
+workflow pin the SDK; bump `OPENWRT_RELEASE` as OpenWrt cuts new releases.
 
 ## Known follow-ups for a maintainer
 
-- `PKG_MIRROR_HASH:=skip` — no release tarball/mirror hash exists yet for this
-  git snapshot. Run `make package/pathdns/download V=s` against a real
-  OpenWrt tree once and fill in the printed hash.
+- `PKG_MIRROR_HASH` is pinned to the sha256 of the `pathdns-0.1.0.tar.zst`
+  produced by OpenWrt's own git clone-then-`git archive` fallback for
+  `PKG_SOURCE_VERSION`'s commit (the documented way to pin a git-sourced
+  package's hash, per `scripts/dl_github_archive.py`'s docstring) — it lets
+  `dl_github_archive.py` fetch straight from GitHub's tarball API instead of
+  a full clone. Re-derive it whenever `PKG_SOURCE_VERSION` changes; the
+  build fails loudly on a mismatch rather than silently using bad source.
 - Upstream has no `LICENSE` file yet despite `Cargo.toml` declaring
   `license = "MIT"`; add one upstream, then set `PKG_LICENSE_FILES:=LICENSE`.
 - pathdns requires Linux kernel >= 6.0 with io_uring available (it self-checks
