@@ -1,12 +1,12 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=pathdns
-PKG_VERSION:=0.1.1
+PKG_VERSION:=0.1.2
 PKG_RELEASE:=1
 
 PKG_SOURCE:=pathdns-linux-aarch64
 PKG_SOURCE_URL:=https://github.com/jasonwei23/pathdns/releases/download/v$(PKG_VERSION)
-PKG_HASH:=713d00a9ef82fdb0f44bfac73e7a73e62a6748a2dbff332c4cffc54cc0cfce82
+PKG_HASH:=330eb780414d4c35a11d5441185ef87dd4ea7dd6ca7d2633fd169b897b0d7105
 
 PKG_MAINTAINER:=jasonwei23 <jasonwei23@users.noreply.github.com>
 PKG_LICENSE:=MIT
